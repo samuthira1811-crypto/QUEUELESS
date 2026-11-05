@@ -28,7 +28,7 @@ export default function App() {
 
   try {
     const response = await fetch(
-      "http://localhost:5000/api/bookings"
+      "https://queueless-backend-k7sr.onrender.com/api/bookings"
     );
 
     const data = await response.json();
@@ -50,7 +50,7 @@ export default function App() {
 async function updateBookingStatus(id, status) {
   try {
     const response = await fetch(
-      `http://localhost:5000/api/bookings/${id}/status`,
+      `https://queueless-backend-k7sr.onrender.com/api/bookings/${id}/status`,
       {
         method: "PATCH",
         headers: {
@@ -94,7 +94,7 @@ async function updateBookingStatus(id, status) {
   async function fetchWaitingInfo(token) {
     try {
       const response = await fetch(
-        `http://localhost:5000/api/bookings/${token}/waiting`
+        `https://queueless-backend-k7sr.onrender.com/api/bookings/${token}/waiting`
       );
 
       const data = await response.json();
@@ -120,7 +120,7 @@ async function updateBookingStatus(id, status) {
         fetchWaitingInfo(booking.token);
 
         try {
-          const response = await fetch("http://localhost:5000/api/bookings");
+          const response = await fetch("https://queueless-backend-k7sr.onrender.com/api/bookings");
           const data = await response.json();
 
           if (response.ok) {
@@ -165,7 +165,7 @@ async function updateBookingStatus(id, status) {
 
     try {
       const response = await fetch(
-        "http://localhost:5000/api/bookings",
+        "https://queueless-backend-k7sr.onrender.com/api/bookings",
         {
           method: "POST",
           headers: {
