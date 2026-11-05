@@ -9,18 +9,29 @@ const mongoose = require("mongoose");
 const nodemailer = require("nodemailer");
 
 const app = express();
-const transporter = nodemailer.createTransport({
-  host: "smtp.gmail.com",
-  port: 465,
-  secure: true,
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS
-  },
-  connectionTimeout: 30000,
-  greetingTimeout: 30000,
-  socketTimeout: 30000
-});
+async function sendQueueLessEmail({ to, subject, text }) {
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${process.env.RESEND_API_KEY}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      from: "Queue Less <onboarding@resend.dev>",
+      to,
+      subject,
+      text
+    })
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.message || JSON.stringify(data));
+  }
+
+  return data;
+}
 
 app.use(cors());
 app.use(express.json());
@@ -79,12 +90,10 @@ app.post("/api/bookings", async (req, res) => {
 let emailSent = false;
 
 try {
-  await transporter.sendMail({
-    from: `"Queue Less" <${process.env.EMAIL_USER}>`,
-    to: booking.email,
-    subject: "Appointment Confirmed | Queue Less",
-
-    text: `
+  await sendQueueLessEmail({
+  to: booking.email,
+  subject: "Appointment Confirmed | Queue Less",
+  text: `
 Hello ${booking.name},
 
 Your clinic appointment has been booked successfully!
@@ -96,8 +105,8 @@ Appointment Time: ${booking.time}
 Status: ${booking.status}
 
 Thank you for choosing Queue Less!
-    `
-  });
+  `
+});
 
   emailSent = true;
   console.log("Booking confirmation email sent to:", booking.email);
@@ -202,11 +211,10 @@ app.patch("/api/bookings/:id/status", async (req, res) => {
     let emailSent = false;
 
     try {
-      await transporter.sendMail({
-        from: process.env.EMAIL_USER,
-        to: booking.email,
-        subject: "Queue Less - Appointment Status Updated",
-        text: `
+      await sendQueueLessEmail({
+  to: booking.email,
+  subject: "Queue Less - Appointment Status Updated",
+  text: `
 Hello ${booking.name},
 
 Your appointment status has been updated!
@@ -218,8 +226,8 @@ Appointment Time: ${booking.time}
 Current Status: ${booking.status}
 
 Thank you for choosing Queue Less!
-        `
-      });
+  `
+});
 
       emailSent = true;
       console.log("Status update email sent to:", booking.email);
