@@ -6,6 +6,7 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const mongoose = require("mongoose");
+const jwt = require("jsonwebtoken");
 const nodemailer = require("nodemailer");
 
 const app = express();
@@ -59,9 +60,54 @@ const bookingSchema = new mongoose.Schema(
 );
 
 const Booking = mongoose.model("Booking", bookingSchema);
+function verifyAdmin(req, res, next) {
+  const token = req.headers.authorization?.split(" ")[1];
+
+  if (!token) {
+    return res.status(401).json({
+      message: "Admin login required"
+    });
+  }
+
+  try {
+    jwt.verify(token, process.env.JWT_SECRET);
+    next();
+  } catch (error) {
+    return res.status(401).json({
+      message: "Invalid or expired admin token"
+    });
+  }
+}
 
 app.get("/", (req, res) => {
   res.json({ message: "Queue Less backend is running!" });
+});
+
+app.post("/api/admin/login", (req, res) => {
+  const { password } = req.body;
+
+  if (!process.env.ADMIN_PASSWORD || !process.env.JWT_SECRET) {
+    return res.status(500).json({
+      message: "Admin authentication is not configured"
+    });
+  }
+
+  if (password !== process.env.ADMIN_PASSWORD) {
+    return res.status(401).json({
+      message: "Incorrect admin password"
+    });
+  }
+
+  const token = jwt.sign(
+    { role: "admin" },
+    process.env.JWT_SECRET,
+    { expiresIn: "2h" }
+  );
+
+  res.json({
+    message: "Admin login successful",
+    token
+  });
 });
 
 app.post("/api/bookings", async (req, res) => {
@@ -132,7 +178,7 @@ Thank you for choosing Queue Less!
   }
 });
 
-app.get("/api/bookings", async (req, res) => {
+app.get("/api/bookings",verifyAdmin, async (req, res) => {
   try {
     const bookings = await Booking.find().sort({ createdAt: -1 });
     res.json(bookings);
@@ -179,9 +225,32 @@ app.get("/api/bookings/:token/waiting", async (req, res) => {
     }
     });
 
+    app.get("/api/bookings/:token/status", async (req, res) => {
+  try {
+    const token = Number(req.params.token);
+
+    const booking = await Booking.findOne({ token }).select("token status");
+
+    if (!booking) {
+      return res.status(404).json({
+        message: "Booking not found"
+      });
+    }
+
+    res.json({
+      token: booking.token,
+      status: booking.status
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      message: "Unable to fetch booking status"
+    });
+  }
+});
     
 
-app.patch("/api/bookings/:id/status", async (req, res) => {
+app.patch("/api/bookings/:id/status",verifyAdmin, async (req, res) => {
   try {
     console.log("PATCH API CALLED");
     const { status } = req.body;

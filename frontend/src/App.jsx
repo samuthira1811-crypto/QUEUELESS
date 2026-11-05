@@ -20,15 +20,63 @@ export default function App() {
   
   const [waitingInfo, setWaitingInfo] = useState(null);
   const [showAdmin, setShowAdmin] = useState(false);
+  const [adminPassword, setAdminPassword] = useState("");
+const [adminToken, setAdminToken] = useState("");
   const [allBookings, setAllBookings] = useState([]);
   const [adminLoading, setAdminLoading] = useState(false);
 
-  async function fetchAllBookings() {
+  async function handleAdminLogin(event) {
+  event.preventDefault();
+
+  try {
+    const response = await fetch(
+      "https://queueless-backend-k7sr.onrender.com/api/admin/login",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          password: adminPassword
+        })
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.message || "Login failed");
+    }
+
+    setAdminToken(data.token);
+    setAdminPassword("");
+    setShowAdmin(true);
+    setMessage("Admin login successful!");
+    await fetchAllBookings(data.token);
+
+  } catch (error) {
+    setMessage(error.message);
+  }
+}
+
+function handleAdminLogout() {
+  setAdminToken("");
+  setAllBookings([]);
+  setShowAdmin(false);
+  setMessage("Admin logged out successfully!");
+}
+
+  async function fetchAllBookings(token = adminToken) {
   setAdminLoading(true);
 
   try {
     const response = await fetch(
-      "https://queueless-backend-k7sr.onrender.com/api/bookings"
+      "https://queueless-backend-k7sr.onrender.com/api/bookings",
+      {
+        headers: {
+          "Authorization": `Bearer ${token}`
+        }
+      }
     );
 
     const data = await response.json();
@@ -36,16 +84,15 @@ export default function App() {
     if (response.ok) {
       setAllBookings(data);
     } else {
-      setMessage("Unable to load bookings");
+      setMessage(data.message || "Unable to load bookings");
     }
+
   } catch (error) {
     setMessage("Backend connection failed");
   } finally {
     setAdminLoading(false);
   }
 }
-
-
 
 async function updateBookingStatus(id, status) {
   try {
@@ -54,7 +101,8 @@ async function updateBookingStatus(id, status) {
       {
         method: "PATCH",
         headers: {
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${adminToken}`
         },
         body: JSON.stringify({ status })
       }
@@ -78,7 +126,6 @@ async function updateBookingStatus(id, status) {
     setMessage(error.message);
   }
 }
-
 
 
   function getTodayDate() {
@@ -114,33 +161,31 @@ async function updateBookingStatus(id, status) {
   
     
     useEffect(() => {
-      if (!booking?.token) return;
+  if (!booking?.token) return;
 
-      const interval = setInterval(async () => {
-        fetchWaitingInfo(booking.token);
+  const interval = setInterval(async () => {
+    fetchWaitingInfo(booking.token);
 
-        try {
-          const response = await fetch("https://queueless-backend-k7sr.onrender.com/api/bookings");
-          const data = await response.json();
+    try {
+      const response = await fetch(
+        `https://queueless-backend-k7sr.onrender.com/api/bookings/${booking.token}/status`
+      );
 
-          if (response.ok) {
-            const latestBooking = data.find(
-              (item) => item.token === booking.token
-            );
+      const data = await response.json();
 
-            if (latestBooking) {
-              setBooking(latestBooking);
-            }
-          }
-        } catch (error) {
-          console.error("Live booking update error:", error);
-        }
-      }, 10000);
+      if (response.ok) {
+        setBooking((prev) => ({
+          ...prev,
+          status: data.status
+        }));
+      }
+    } catch (error) {
+      console.error("Live booking update error:", error);
+    }
+  }, 10000);
 
-      return () => clearInterval(interval);
-    }, [booking?.token]);
-
-
+  return () => clearInterval(interval);
+}, [booking?.token]);
 
 
   async function handleSubmit(event) {
@@ -219,13 +264,13 @@ async function updateBookingStatus(id, status) {
         <button
           type="button"
           onClick={() => {
-            const next = !showAdmin;
-            setShowAdmin(next);
+  const next = !showAdmin;
+  setShowAdmin(next);
 
-            if (next) {
-              fetchAllBookings();
-            }
-          }}
+  if (next && adminToken) {
+    fetchAllBookings();
+  }
+}}
         >
           {showAdmin ? "Patient Booking" : "Admin Dashboard"}
         </button>
@@ -239,7 +284,32 @@ async function updateBookingStatus(id, status) {
         
         {showAdmin && (
           <section className="booking-card">
+            {!adminToken && (
+  <form onSubmit={handleAdminLogin}>
+    <h2>Admin Login</h2>
+
+    <label>Admin Password</label>
+
+    <input
+      type="password"
+      value={adminPassword}
+      onChange={(e) => setAdminPassword(e.target.value)}
+      placeholder="Enter admin password"
+      required
+    />
+
+    <button type="submit">
+      Login
+    </button>
+  </form>
+)}
+
+{adminToken && (
+  <>
             <h1>Admin Dashboard</h1>
+            <button type="button" onClick={handleAdminLogout}>
+  Logout
+</button>
             <p>Manage patient appointments and queue status.</p>
 
             <button type="button" onClick={fetchAllBookings}>
@@ -281,6 +351,8 @@ async function updateBookingStatus(id, status) {
 </select>
               </div>
             ))}
+              </>
+)}
           </section>
         )}
 
