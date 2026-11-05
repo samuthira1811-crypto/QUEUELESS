@@ -10,17 +10,21 @@ const nodemailer = require("nodemailer");
 
 const app = express();
 async function sendQueueLessEmail({ to, subject, text }) {
-  const response = await fetch("https://api.resend.com/emails", {
+  const response = await fetch("https://api.brevo.com/v3/smtp/email", {
     method: "POST",
     headers: {
-      "Authorization": `Bearer ${process.env.RESEND_API_KEY}`,
-      "Content-Type": "application/json"
+      "api-key": process.env.BREVO_API_KEY,
+      "Content-Type": "application/json",
+      "accept": "application/json"
     },
     body: JSON.stringify({
-      from: "Queue Less <onboarding@resend.dev>",
-      to,
+      sender: {
+        name: "Queue Less",
+        email: process.env.EMAIL_USER
+      },
+      to: [{ email: to }],
       subject,
-      text
+      textContent: text
     })
   });
 
